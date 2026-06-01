@@ -1,20 +1,12 @@
 ﻿import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: [
-      "tesseract.js",
-      "sharp",
-      "pdf-lib",
-      "pdfkit",
-      "libreoffice-convert",
-    ],
-  },
-  serverExternalPackages: ["libreoffice-convert"],
-  api: {
-    bodyParser: {
-      sizeLimit: "500mb",
-    },
-  },
+  serverExternalPackages: [
+    "tesseract.js",
+    "sharp",
+    "pdf-lib",
+    "pdfkit",
+    "libreoffice-convert",
+  ],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "*.amazonaws.com" },
