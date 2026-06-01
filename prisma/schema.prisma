@@ -1,0 +1,226 @@
+// prisma/schema.prisma
+// ConvertAI Database Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ ENUMS ============
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum SubscriptionPlan {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  INACTIVE
+  CANCELLED
+  PAST_DUE
+  TRIALING
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum JobType {
+  CONVERSION
+  COMPRESSION
+  OCR
+  SCAN
+}
+
+enum PaymentProvider {
+  STRIPE
+  RAZORPAY
+}
+
+// ============ MODELS ============
+
+model User {
+  id                String             @id @default(cuid())
+  email             String             @unique
+  name              String?
+  image             String?
+  password          String?
+  role              UserRole           @default(USER)
+  emailVerified     DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  // Relations
+  accounts          Account[]
+  sessions          Session[]
+  subscription      Subscription?
+  files             File[]
+  jobs              Job[]
+  usageStats        UsageStats?
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  userId               String             @unique
+  plan                 SubscriptionPlan   @default(FREE)
+  status               SubscriptionStatus @default(ACTIVE)
+  provider             PaymentProvider?
+  stripeCustomerId     String?            @unique
+  stripeSubscriptionId String?            @unique
+  razorpayCustomerId   String?
+  razorpaySubscriptionId String?
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+model File {
+  id           String   @id @default(cuid())
+  userId       String?
+  originalName String
+  storedName   String
+  mimeType     String
+  size         Int
+  url          String
+  s3Key        String?
+  isTemporary  Boolean  @default(true)
+  expiresAt    DateTime?
+  createdAt    DateTime @default(now())
+
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  inputJobs    Job[]    @relation("InputFile")
+  outputJobs   Job[]    @relation("OutputFile")
+
+  @@map("files")
+}
+
+model Job {
+  id            String    @id @default(cuid())
+  userId        String?
+  type          JobType
+  status        JobStatus @default(PENDING)
+  inputFileId   String?
+  outputFileId  String?
+  inputFormat   String?
+  outputFormat  String?
+  options       Json?
+  result        Json?
+  error         String?
+  progress      Int       @default(0)
+  processingTime Int?
+  queueJobId    String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  completedAt   DateTime?
+
+  user       User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  inputFile  File?  @relation("InputFile", fields: [inputFileId], references: [id])
+  outputFile File?  @relation("OutputFile", fields: [outputFileId], references: [id])
+
+  @@map("jobs")
+}
+
+model UsageStats {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  date            DateTime @default(now()) @db.Date
+  conversions     Int      @default(0)
+  compressions    Int      @default(0)
+  ocrScans        Int      @default(0)
+  totalDataMB     Float    @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("usage_stats")
+}
+
+model DailyUsage {
+  id           String   @id @default(cuid())
+  userId       String
+  date         DateTime @db.Date
+  conversions  Int      @default(0)
+  compressions Int      @default(0)
+  ocrScans     Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, date])
+  @@map("daily_usage")
+}
+
+model PlatformStats {
+  id              String   @id @default(cuid())
+  date            DateTime @db.Date @unique
+  totalUsers      Int      @default(0)
+  newUsers        Int      @default(0)
+  activeUsers     Int      @default(0)
+  totalJobs       Int      @default(0)
+  conversions     Int      @default(0)
+  compressions    Int      @default(0)
+  ocrScans        Int      @default(0)
+  revenue         Float    @default(0)
+  createdAt       DateTime @default(now())
+
+  @@map("platform_stats")
+}
