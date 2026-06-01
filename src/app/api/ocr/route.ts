@@ -6,12 +6,13 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { randomUUID } from "crypto";
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+
 
 // POST /api/ocr
 export async function POST(req: NextRequest) {
+  const groq = process.env.GROQ_API_KEY
+    ? new Groq({ apiKey: process.env.GROQ_API_KEY })
+    : null;
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
   const language = (formData.get("language") as string) || "eng";
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
     // Step 2: Enhance with Groq AI (format + fix OCR mistakes)
     let enhancedText = rawText;
 
-    if (rawText.length > 10 && process.env.GROQ_API_KEY) {
+    if (rawText.length > 10 && groq) {
       try {
         const groqResponse = await groq.chat.completions.create({
           model: "llama-3.1-8b-instant",
@@ -111,3 +112,4 @@ You receive raw OCR output and must:
     );
   }
 }
+
